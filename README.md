@@ -90,8 +90,8 @@ Narrative labels added in `data/processed/` are original annotations produced fo
 ## Setup
 
 ```bash
-git clone <this-repo-url>
-cd <this-repo>
+git clone [<this-repo-url>](https://github.com/mohammedOwaiskh/narrative-aware-propaganda-detection.git)
+cd narrative-aware-propaganda-detection
 pip install -r requirements.txt
 python semeval_data_extractor.py
 ```
