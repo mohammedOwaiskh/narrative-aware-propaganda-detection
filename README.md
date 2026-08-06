@@ -65,11 +65,23 @@ This project uses **SemEval-2020 Task 11: Detection of Propaganda Techniques in 
 
 ```bibtex
 @InProceedings{SemEval20-11-DaSanMartino,
-  author    = {Da San Martino, Giovanni and Barr\'{o}n-Cede\~{n}o, Alberto and Wachsmuth, Henning and Petrov, Rostislav and Nakov, Preslav},
-  title     = {{S}em{E}val-2020 Task 11: {D}etection of Propaganda Techniques in News Articles},
-  booktitle = {Proceedings of the 14th International Workshop on Semantic Evaluation (SemEval 2020)},
-  year      = {2020},
-  address   = {Barcelona, Spain}
+author = "Da San Martino, Giovanni and
+  Barr\'{o}n-Cede\~no, Alberto and
+  Wachsmuth, Henning and
+  Petrov, Rostislav and
+  Nakov, Preslav",
+ title = "{SemEval}-2020 Task 11: {D}etection of Propaganda Techniques in News 
+Articles",
+ pages = "",
+ abstract = "We describe the outcome of the SemEval 2020 Task 11 on the 
+	detection of propaganda in news articles. We present two tasks. In the 
+	first task, systems are asked to identify specific text spans in a free 
+	text where propaganda is being applied. In the second task, systems are 
+	asked to identify the propaganda technique being applied in a text span. We 
+	describe the construction of the evaluation framework (dataset and 
+	evaluation metrics) as well as the approaches explored by the different 
+	participants. ",
+crossref = "SemEval20"
 }
 ```
 
