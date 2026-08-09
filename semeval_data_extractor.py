@@ -17,10 +17,19 @@ import os
 import re
 from pathlib import Path
 
-ROOT_DIR = Path(__file__).parent.parent.parent
+ROOT_DIR = Path(__file__).parent
 DATA_DIR = os.path.join(ROOT_DIR, "data")
 RAW_DATA_DIR = os.path.join(DATA_DIR, "raw", "datasets-v2", "datasets")
 
+TOPIC_KEYWORDS = {
+    "immigration": ["immigra", "border wall", "daca", "deport"],
+    "israel_middle_east": ["israel", "palestin", "gaza", "jerusalem"],
+    "kavanaugh_scotus": ["kavanaugh", "supreme court nomin"],
+    "trump_russia_probe": ["mueller", "russia probe", "collusion", "manafort"],
+    "las_vegas_shooting": ["las vegas", "paddock", "mandalay bay"],
+}
+
+SELECTED_TOPIC = "immigration"
 
 def load_articles():
     articles = {}
@@ -51,7 +60,13 @@ def main():
     articles = load_articles()
     labels = load_technique_labels()
 
-    out_path = os.path.join(DATA_DIR, "processed", "train_data.csv")
+    kws = TOPIC_KEYWORDS[SELECTED_TOPIC]
+    subset_ids = sorted(
+        aid for aid, text in articles.items() if any(k in text.lower() for k in kws)
+    )
+    print(f"Selected topic: {SELECTED_TOPIC} -> {len(subset_ids)} articles")
+
+    out_path = os.path.join(DATA_DIR, "processed", f"{SELECTED_TOPIC}_subset.csv")
     with open(out_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(["article_id", "text", "techniques", "narrative_label"])
