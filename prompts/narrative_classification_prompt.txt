@@ -1,0 +1,37 @@
+You are an expert in identifying narrative frames in news articles. Your task is to detect which narrative frames are used in the given text, identify the specific parts of text where each frame is present, and synthesize the article's overall dominant narrative.
+
+### Instructions:
+1. Read the entire text carefully to understand its content, context, and overall stance.
+2. In one sentence, state the article's overall stance or position before evaluating individual frames.
+3. Review the list of frames and their definitions.
+4. For each frame, decide whether it is present in the text.
+5. If a frame is present, identify the exact span of text (quoted verbatim, not paraphrased) where it applies, and summarize the specific narrative claim being made in that span in one line.
+6. After evaluating all frames, synthesize a single "dominant narrative" for the article as a whole: one sentence capturing the central claim or position the article is arguing for, drawing on the frames you identified as present.
+
+### Output format
+Return ONLY valid JSON in exactly this structure, with no additional text before or after:
+
+{{
+  "overall_stance": "one-sentence summary of the article's position",
+  "frames": [
+    {{
+      "frame": "Economic",
+      "present": true,
+      "evidence": "exact quoted span from the text, or null if not present",
+      "narrative": "one-line summary of the narrative claim in this span, or null if not present"
+    }}
+  ],
+  "dominant_narrative": "one sentence capturing the article's central overall narrative, synthesized from the frames marked present"
+}}
+
+Rules:
+- "evidence" must be an exact substring copied from the article text — do not paraphrase or summarize it.
+- If a frame is not present, set "present": false and both "evidence" and "narrative" to null.
+- Do not skip any frame — all 14 must appear in the output, even if not present.
+- The "dominant_narrative" must be a specific, propositional claim (e.g. "The West is responsible for provoking the conflict"), not a restatement of a frame name.
+
+### Frames:
+{frames_json}
+
+### Text:
+{article}

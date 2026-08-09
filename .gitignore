@@ -217,3 +217,7 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 /data/datasets-v2/
+
+# Application logs
+/logs/
+*.log
