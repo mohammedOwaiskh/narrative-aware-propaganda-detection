@@ -11,9 +11,9 @@ Term paper for *Advanced Topics in Computational Text and Media Sciences* (MSc N
 
 > Does knowledge of an article's broader narrative/frame help an LLM identify the propaganda techniques used within it?
 
-**RQ1** — Are particular propaganda techniques systematically associated with particular narratives?
-**RQ2** — Does providing narrative context improve LLM propaganda-technique classification vs. article-only input?
-**RQ3** — Which techniques benefit most (or least, or negatively) from narrative context?
+**RQ1** — Are particular propaganda techniques systematically associated with particular narratives?  
+**RQ2** — Does providing narrative context improve LLM propaganda-technique classification vs. article-only input?  
+**RQ3** — Which techniques benefit most (or least, or negatively) from narrative context?  
 
 ## Approach
 
@@ -90,7 +90,7 @@ Narrative labels added in `data/processed/` are original annotations produced fo
 ## Setup
 
 ```bash
-git clone [<this-repo-url>](https://github.com/mohammedOwaiskh/narrative-aware-propaganda-detection.git)
+git clone https://github.com/mohammedOwaiskh/narrative-aware-propaganda-detection.git
 cd narrative-aware-propaganda-detection
 pip install -r requirements.txt
 python semeval_data_extractor.py
