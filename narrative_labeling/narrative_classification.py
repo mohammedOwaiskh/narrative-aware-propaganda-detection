@@ -289,7 +289,7 @@ def main():
     already_done = set()
     if Path(args.output).exists():
         existing = pd.read_csv(args.output)
-        already_done = set(existing[args.id_col].astype(str))
+        already_done = set(existing["article_id"].astype(str))
         rows = existing.to_dict("records")
         logger.info(f"Resuming: {len(already_done)} articles already labeled")
     else:
@@ -314,7 +314,7 @@ def main():
             except RuntimeError as e:
                 logger.error(f"Article {article_id}: Classification failed - {e}")
                 failed_count += 1
-                failed_rows = [{
+                failed_row = {
                     "article_id": article_id,
                     "overall_stance": None,
                     "dominant_narrative": None,
@@ -322,9 +322,9 @@ def main():
                     "validation_warnings": f"API_FAILURE: {e}",
                     "human_verified": False,
                     "human_corrected_narrative": "",
-                }]
-                _save(failed_rows, "failures.csv")
-                break
+                }
+                _append_failure(failed_row)
+                continue
 
             warnings = validate_result(result, frames, article_text)
             if warnings:
@@ -397,6 +397,29 @@ def _save(rows: list, output_path: str) -> None:
     logger.info(f"Saving {len(rows)} rows to {output_path}")
     pd.DataFrame(rows).to_csv(full_path, index=False)
     logger.debug(f"File saved successfully to {full_path}")
+
+
+def _append_failure(row: dict) -> None:
+    """Append a single failed article's record to failures.csv without overwriting prior failures."""
+    failures_path = f"{get_project_root()}/data/processed/failures.csv"
+    file_exists = Path(failures_path).exists()
+
+    existing_ids = set()
+    if file_exists:
+        existing = pd.read_csv(failures_path)
+        existing_ids = set(existing["article_id"].astype(str))
+
+    if str(row["article_id"]) in existing_ids:
+        return
+
+    df_row = pd.DataFrame([row])
+    df_row.to_csv(
+        failures_path,
+        mode="a",
+        header=not file_exists,
+        index=False,
+    )
+    logger.info(f"Failure logged to failures.csv (article_id={row['article_id']})")
 
 
 if __name__ == '__main__':
