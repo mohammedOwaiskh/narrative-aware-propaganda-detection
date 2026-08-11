@@ -329,7 +329,8 @@ def main():
     logger.info(f"Input file: {args.input}")
     logger.info(f"Output file: {args.output}")
 
-    client = Groq()
+    # client = Groq()
+    load_model()
 
     logger.info("Loading frames configuration...")
     frames = read_frames()
@@ -352,7 +353,6 @@ def main():
     processed_count = 0
     failed_count = 0
     try:
-        load_model()
 
         for articles in articles_csv:
             article_id = articles["article_id"]
