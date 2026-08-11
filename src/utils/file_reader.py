@@ -5,7 +5,7 @@ import os
 
 def get_project_root() -> Path:
     """Get the project root directory."""
-    return Path(__file__).parent.parent
+    return Path(__file__).parent.parent.parent
 
 
 def read_prompt() -> str:
@@ -26,3 +26,6 @@ def read_processed_data(data_file: str) -> list[dict]:
     data_path = os.path.join(get_project_root(), 'data', 'processed', data_file)
     data = csv.DictReader(open(data_path, 'r', encoding='utf-8'))
     return [row for row in data]
+
+if __name__ == "__main__":
+    print(get_project_root())
