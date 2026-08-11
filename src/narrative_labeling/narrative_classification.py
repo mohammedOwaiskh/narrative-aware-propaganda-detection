@@ -111,77 +111,77 @@ def generate(prompt: str, max_new_tokens: int = 1024) -> dict:
     return json.loads(raw_result)
 
 
-def prompt_llama(client: Groq, prompt: str) -> dict:
-    """
-    Call the Groq Llama API with exponential backoff retry logic.
-    
-    This function sends a prompt to the Groq API (using Llama 3.3-70b model)
-    and handles transient failures with exponential backoff. It expects a JSON
-    response and automatically parses it.
-    
-    Args:
-        client (Groq): Initialized Groq client instance.
-        prompt (str): The prompt to send to the API. Should be a well-formatted
-                     string that will be sent as user content.
-    
-    Returns:
-        dict: Parsed JSON response from the API.
-    
-    Raises:
-        RuntimeError: If all MAX_RETRIES attempts fail or if JSON parsing fails
-                     without a successful retry.
-    
-    Notes:
-        - Retries up to MAX_RETRIES times with exponential backoff
-        - Wait time = BASE_BACKOFF_SECONDS * attempt_number
-        - HTTP errors and transient API errors trigger retries
-        - JSON parse errors don't trigger retries (assumed to be response malformation)
-        - All API calls and errors are logged at appropriate levels (INFO/WARNING/ERROR)
-    """
-    last_error = None
-    for attempt in range(1, MAX_RETRIES + 1):
-        try:
-            logger.info(f"Calling Groq API (attempt {attempt}/{MAX_RETRIES}) with model: {MODEL_NAME}")
-            logger.debug(f"Prompt length: {len(prompt)} characters")
-
-            response = client.chat.completions.create(
-                model=MODEL_NAME,
-                messages=[{"role": USER_ROLE, "content": prompt}],
-                temperature=TEMPERATURE,
-                max_tokens=MAX_OUTPUT_TOKENS,
-                response_format={"type": "json_object"},
-            )
-
-            logger.info(f"API call successful on attempt {attempt}")
-            raw = response.choices[0].message.content
-            result = json.loads(raw)
-            logger.debug(f"Successfully parsed JSON response")
-            return result
-        except json.JSONDecodeError as e:
-            last_error = f"JSON parse error: {e}"
-            logger.warning(f"JSON parsing failed on attempt {attempt}: {last_error}")
-        except HTTPStatusError as e:
-            last_error = str(e)
-            wait = BASE_BACKOFF_SECONDS * attempt
-            logger.warning(
-                f"HTTP error on attempt {attempt}/{MAX_RETRIES}: {last_error} -- waiting {wait}s before retry")
-            time.sleep(wait)
-            continue
-        except Exception as e:
-            # Groq rate-limit / transient errors: back off and retry
-            last_error = str(e)
-            wait = BASE_BACKOFF_SECONDS * attempt
-            logger.warning(
-                f"API error on attempt {attempt}/{MAX_RETRIES}: {last_error} -- waiting {wait}s before retry")
-            time.sleep(wait)
-            continue
-        # If we got here without exception, JSON parsed successfully -> exit loop
-        break
-    else:
-        error_msg = f"Failed after {MAX_RETRIES} attempts: {last_error}"
-        logger.error(error_msg)
-        raise RuntimeError(error_msg)
-    return None  # unreachable, kept for clarity
+# def prompt_llama(client: Groq, prompt: str) -> dict:
+#     """
+#     Call the Groq Llama API with exponential backoff retry logic.
+#
+#     This function sends a prompt to the Groq API (using Llama 3.3-70b model)
+#     and handles transient failures with exponential backoff. It expects a JSON
+#     response and automatically parses it.
+#
+#     Args:
+#         client (Groq): Initialized Groq client instance.
+#         prompt (str): The prompt to send to the API. Should be a well-formatted
+#                      string that will be sent as user content.
+#
+#     Returns:
+#         dict: Parsed JSON response from the API.
+#
+#     Raises:
+#         RuntimeError: If all MAX_RETRIES attempts fail or if JSON parsing fails
+#                      without a successful retry.
+#
+#     Notes:
+#         - Retries up to MAX_RETRIES times with exponential backoff
+#         - Wait time = BASE_BACKOFF_SECONDS * attempt_number
+#         - HTTP errors and transient API errors trigger retries
+#         - JSON parse errors don't trigger retries (assumed to be response malformation)
+#         - All API calls and errors are logged at appropriate levels (INFO/WARNING/ERROR)
+#     """
+#     last_error = None
+#     for attempt in range(1, MAX_RETRIES + 1):
+#         try:
+#             logger.info(f"Calling Groq API (attempt {attempt}/{MAX_RETRIES}) with model: {MODEL_NAME}")
+#             logger.debug(f"Prompt length: {len(prompt)} characters")
+#
+#             response = client.chat.completions.create(
+#                 model=MODEL_NAME,
+#                 messages=[{"role": USER_ROLE, "content": prompt}],
+#                 temperature=TEMPERATURE,
+#                 max_tokens=MAX_OUTPUT_TOKENS,
+#                 response_format={"type": "json_object"},
+#             )
+#
+#             logger.info(f"API call successful on attempt {attempt}")
+#             raw = response.choices[0].message.content
+#             result = json.loads(raw)
+#             logger.debug(f"Successfully parsed JSON response")
+#             return result
+#         except json.JSONDecodeError as e:
+#             last_error = f"JSON parse error: {e}"
+#             logger.warning(f"JSON parsing failed on attempt {attempt}: {last_error}")
+#         except HTTPStatusError as e:
+#             last_error = str(e)
+#             wait = BASE_BACKOFF_SECONDS * attempt
+#             logger.warning(
+#                 f"HTTP error on attempt {attempt}/{MAX_RETRIES}: {last_error} -- waiting {wait}s before retry")
+#             time.sleep(wait)
+#             continue
+#         except Exception as e:
+#             # Groq rate-limit / transient errors: back off and retry
+#             last_error = str(e)
+#             wait = BASE_BACKOFF_SECONDS * attempt
+#             logger.warning(
+#                 f"API error on attempt {attempt}/{MAX_RETRIES}: {last_error} -- waiting {wait}s before retry")
+#             time.sleep(wait)
+#             continue
+#         # If we got here without exception, JSON parsed successfully -> exit loop
+#         break
+#     else:
+#         error_msg = f"Failed after {MAX_RETRIES} attempts: {last_error}"
+#         logger.error(error_msg)
+#         raise RuntimeError(error_msg)
+#     return None  # unreachable, kept for clarity
 
 
 def build_prompt(article_text: str, frames: dict) -> str:
