@@ -15,9 +15,9 @@ import collections
 import csv
 import os
 import re
-from pathlib import Path
+from utils.file_reader import get_project_root
 
-ROOT_DIR = Path(__file__).parent
+ROOT_DIR = get_project_root()
 DATA_DIR = os.path.join(ROOT_DIR, "data")
 RAW_DATA_DIR = os.path.join(DATA_DIR, "raw", "datasets-v2", "datasets")
 
