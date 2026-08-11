@@ -38,7 +38,7 @@ from pathlib import Path
 
 import pandas as pd
 from dotenv import load_dotenv
-from groq import Groq
+# from groq import Groq
 from httpx import HTTPStatusError
 
 from utils.file_reader import read_frames, read_prompt, read_processed_data, get_project_root
