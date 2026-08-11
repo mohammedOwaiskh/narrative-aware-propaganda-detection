@@ -32,7 +32,6 @@ Usage:
 Author: Mohammed Owais Khan
 """
 import argparse
-import json
 import os
 import time
 from pathlib import Path
@@ -49,12 +48,67 @@ load_dotenv()
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 logger = setup_logger(__name__)
 
-MODEL_NAME = "llama-3.3-70b-versatile"
+# MODEL_NAME = "llama-3.3-70b-versatile"
 USER_ROLE = "user"
 MAX_RETRIES = 3
 TEMPERATURE = 0.0
 MAX_OUTPUT_TOKENS = 4096
 BASE_BACKOFF_SECONDS = 5
+
+import json
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+
+MODEL_NAME = "meta-llama/Llama-3.1-8B-Instruct"
+
+_model = None
+_tokenizer = None
+
+
+def load_model():
+    """Call once at the start of the script. Loads 4-bit quantized model onto T4."""
+    global _model, _tokenizer
+
+    bnb_config = BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_quant_type="nf4",
+        bnb_4bit_compute_dtype=torch.bfloat16,
+        bnb_4bit_use_double_quant=True,
+    )
+
+    _tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+    _model = AutoModelForCausalLM.from_pretrained(
+        MODEL_NAME,
+        quantization_config=bnb_config,
+        device_map="auto",
+    )
+    return _model, _tokenizer
+
+
+def generate(prompt: str, max_new_tokens: int = 1024) -> dict:
+    """
+    Direct replacement for your call_groq_api(prompt) function.
+    Returns raw text — feed it into the same JSON-parsing/validation logic
+    you already have for the Groq response.
+    """
+    messages = [{"role": "user", "content": prompt}]
+    input_ids = _tokenizer.apply_chat_template(
+        messages, add_generation_prompt=True, return_tensors="pt"
+    ).to(_model.device)
+
+    with torch.no_grad():
+        output_ids = _model.generate(
+            input_ids,
+            max_new_tokens=max_new_tokens,
+            do_sample=False,
+            temperature=None,
+            top_p=None,
+            pad_token_id=_tokenizer.eos_token_id,
+        )
+
+    generated = output_ids[0][input_ids.shape[-1]:]
+    raw_result = _tokenizer.decode(generated, skip_special_tokens=True)
+    return json.loads(raw_result)
 
 
 def prompt_llama(client: Groq, prompt: str) -> dict:
@@ -297,8 +351,9 @@ def main():
 
     processed_count = 0
     failed_count = 0
-
     try:
+        load_model()
+
         for articles in articles_csv:
             article_id = articles["article_id"]
             if article_id in already_done:
@@ -309,7 +364,8 @@ def main():
             prompt = build_prompt(article_text, frames)
 
             try:
-                result = prompt_llama(client, prompt)
+                # result = prompt_llama(client, prompt)
+                result = generate(prompt)
                 logger.info(f"Article {article_id}: Successfully classified")
             except RuntimeError as e:
                 logger.error(f"Article {article_id}: Classification failed - {e}")
