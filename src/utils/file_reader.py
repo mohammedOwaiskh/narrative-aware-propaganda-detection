@@ -1,7 +1,8 @@
 import csv
 import json
-from pathlib import Path
 import os
+from pathlib import Path
+
 
 def get_project_root() -> Path:
     """Get the project root directory."""
@@ -9,16 +10,18 @@ def get_project_root() -> Path:
 
 
 def read_prompt() -> str:
-    prompt_path =   os.path.join(get_project_root(), 'prompts', 'narrative_classification_prompt.txt')
+    prompt_path = os.path.join(get_project_root(), 'src', 'prompts', 'narrative_classification_prompt.txt')
     with open(prompt_path, 'r') as prompt_file:
         prompt = prompt_file.read()
         return prompt
 
+
 def read_frames() -> dict:
-    frames_path = os.path.join(get_project_root(), 'prompts', 'frames.json')
+    frames_path = os.path.join(get_project_root(), 'src', 'prompts', 'frames.json')
     with open(frames_path) as frames_file:
         frames = json.loads(frames_file.read())
         return frames
+
 
 def read_processed_data(data_file: str) -> list[dict]:
     if not data_file.endswith('.csv'):
@@ -26,6 +29,7 @@ def read_processed_data(data_file: str) -> list[dict]:
     data_path = os.path.join(get_project_root(), 'data', 'processed', data_file)
     data = csv.DictReader(open(data_path, 'r', encoding='utf-8'))
     return [row for row in data]
+
 
 if __name__ == "__main__":
     print(get_project_root())

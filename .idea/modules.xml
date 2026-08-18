@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/narrative-aware-propaganda-detection.iml" filepath="$PROJECT_DIR$/.idea/narrative-aware-propaganda-detection.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/narraprop.iml" filepath="$PROJECT_DIR$/.idea/narraprop.iml" />
     </modules>
   </component>
 </project>
