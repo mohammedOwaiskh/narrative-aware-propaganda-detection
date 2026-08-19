@@ -98,7 +98,7 @@ def generate(prompt: str, max_new_tokens: int = 1024) -> dict:
 
     with torch.no_grad():
         output_ids = _model.generate(
-            input_ids,
+            **input_ids,
             max_new_tokens=max_new_tokens,
             do_sample=False,
             temperature=None,
@@ -106,7 +106,7 @@ def generate(prompt: str, max_new_tokens: int = 1024) -> dict:
             pad_token_id=_tokenizer.eos_token_id,
         )
 
-    generated = output_ids[0][input_ids.shape[-1]:]
+    generated = output_ids[0][input_ids["input_ids"].shape[-1]:]
     raw_result = _tokenizer.decode(generated, skip_special_tokens=True)
     return json.loads(raw_result)
 
