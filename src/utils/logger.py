@@ -2,6 +2,9 @@ import logging
 from pathlib import Path
 from datetime import datetime
 
+DEBUG = logging.DEBUG
+INFO = logging.INFO
+ERROR = logging.ERROR
 
 def setup_logger(name: str, log_level=logging.INFO) -> logging.Logger:
     """

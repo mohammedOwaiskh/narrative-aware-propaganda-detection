@@ -35,18 +35,19 @@ import argparse
 import os
 import time
 from pathlib import Path
+from json_repair import repair_json
 
 import pandas as pd
 from dotenv import load_dotenv
 
 from utils.file_reader import read_frames, read_prompt, read_processed_data, get_project_root
-from utils.logger import setup_logger
+from utils.logger import setup_logger, DEBUG
 
 # from groq import Groq
 
 load_dotenv()
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-logger = setup_logger(__name__)
+logger = setup_logger(__name__,DEBUG)
 
 # MODEL_NAME = "llama-3.3-70b-versatile"
 USER_ROLE = "user"
@@ -109,7 +110,11 @@ def generate(prompt: str, max_new_tokens: int = 1024) -> dict:
     generated = output_ids[0][input_ids["input_ids"].shape[-1]:]
     raw_result = _tokenizer.decode(generated, skip_special_tokens=True)
     logger.debug(raw_result)
-    return json.loads(raw_result)
+    try:
+      parsed = json.loads(raw_result)
+    except json.JSONDecodeError:
+      parsed = json.loads(repair_json(raw_result))
+    return parsed
 
 
 # def prompt_llama(client: Groq, prompt: str) -> dict:
