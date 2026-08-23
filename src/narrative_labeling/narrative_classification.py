@@ -38,11 +38,11 @@ from pathlib import Path
 
 import pandas as pd
 from dotenv import load_dotenv
-# from groq import Groq
-from httpx import HTTPStatusError
 
 from utils.file_reader import read_frames, read_prompt, read_processed_data, get_project_root
 from utils.logger import setup_logger
+
+# from groq import Groq
 
 load_dotenv()
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
@@ -108,6 +108,7 @@ def generate(prompt: str, max_new_tokens: int = 1024) -> dict:
 
     generated = output_ids[0][input_ids["input_ids"].shape[-1]:]
     raw_result = _tokenizer.decode(generated, skip_special_tokens=True)
+    logger.debug(raw_result)
     return json.loads(raw_result)
 
 
@@ -367,6 +368,7 @@ def main():
                 # result = prompt_llama(client, prompt)
                 result = generate(prompt)
                 logger.info(f"Article {article_id}: Successfully classified")
+                return
             except RuntimeError as e:
                 logger.error(f"Article {article_id}: Classification failed - {e}")
                 failed_count += 1
