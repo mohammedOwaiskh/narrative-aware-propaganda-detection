@@ -8,6 +8,9 @@ def get_project_root() -> Path:
     """Get the project root directory."""
     return Path(__file__).parent.parent.parent
 
+def get_processed_data_path() -> Path:
+    """Get the processed data path."""
+    return get_project_root() / 'data' / 'processed'
 
 def read_prompt() -> str:
     prompt_path = os.path.join(get_project_root(), 'src', 'prompts', 'narrative_classification_prompt.txt')
@@ -26,7 +29,7 @@ def read_frames() -> dict:
 def read_processed_data(data_file: str) -> list[dict]:
     if not data_file.endswith('.csv'):
         raise ValueError('File must end with .csv')
-    data_path = os.path.join(get_project_root(), 'data', 'processed', data_file)
+    data_path = os.path.join(get_processed_data_path(), data_file)
     data = csv.DictReader(open(data_path, 'r', encoding='utf-8'))
     return [row for row in data]
 

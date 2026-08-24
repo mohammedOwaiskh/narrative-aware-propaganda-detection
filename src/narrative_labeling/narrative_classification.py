@@ -1,30 +1,31 @@
 """
-Narrative Frame Classification Pipeline using Groq Llama 3.3 API.
+Narrative Frame Classification Pipeline using Llama 3.1 8B.
 
 This module implements an end-to-end pipeline for classifying articles according
-to narrative frames using the Groq API with Llama 3.3-70b model. The system:
+to narrative frames using the Llama 3.1-8B-Instruct model with 4-bit quantization.
+The system:
 
 1. Reads articles from a CSV file
 2. Constructs prompts with frame definitions
-3. Calls the Groq API with exponential backoff retry logic
+3. Calls the local Llama model with proper tokenization
 4. Validates responses for completeness and consistency
 5. Saves results to CSV with support for resume/checkpointing
 6. Handles interrupts gracefully by saving progress
 
 Features:
-    - Automatic retry with exponential backoff on API failures
+    - Local model inference with 4-bit quantization (BitsAndBytes)
     - Resume capability: skips already-processed articles
     - Keyboard interrupt handling with automatic checkpointing
     - Comprehensive logging to both console and file
     - Validation of LLM output (missing fields, invalid evidence, etc.)
-    - JSON response parsing with error handling
+    - JSON response parsing with automatic repair on decode errors
 
 Configuration:
-    - Requires GROQ_API_KEY environment variable
     - Loads frame definitions from prompts/frames.json
     - Loads prompt template from prompts/narrative_classification_prompt.txt
     - Reads articles from data/processed/{input_file}
     - Writes results to data/processed/{output_file}
+    - Uses meta-llama/Llama-3.1-8B-Instruct model
 
 Usage:
     python narrative_classification.py --input articles.csv --output results.csv
@@ -32,29 +33,18 @@ Usage:
 Author: Mohammed Owais Khan
 """
 import argparse
-import os
 import time
 from pathlib import Path
-from json_repair import repair_json
 
 import pandas as pd
 from dotenv import load_dotenv
+from json_repair import repair_json
 
-from utils.file_reader import read_frames, read_prompt, read_processed_data, get_project_root
+from utils.file_reader import read_frames, read_prompt, read_processed_data, get_project_root, get_processed_data_path
 from utils.logger import setup_logger, DEBUG
 
-# from groq import Groq
-
 load_dotenv()
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-logger = setup_logger(__name__,DEBUG)
-
-# MODEL_NAME = "llama-3.3-70b-versatile"
-USER_ROLE = "user"
-MAX_RETRIES = 3
-TEMPERATURE = 0.0
-MAX_OUTPUT_TOKENS = 4096
-BASE_BACKOFF_SECONDS = 5
+logger = setup_logger(__name__)
 
 import json
 import torch
@@ -88,9 +78,20 @@ def load_model():
 
 def generate(prompt: str, max_new_tokens: int = 1024) -> dict:
     """
-    Direct replacement for your call_groq_api(prompt) function.
-    Returns raw text — feed it into the same JSON-parsing/validation logic
-    you already have for the Groq response.
+    Generate a response using the local Llama model.
+    
+    Tokenizes the prompt using the chat template, generates tokens with the model,
+    and parses the output as JSON. Attempts automatic JSON repair if parsing fails.
+    
+    Args:
+        prompt (str): The prompt to send to the model.
+        max_new_tokens (int): Maximum number of new tokens to generate (default: 1024).
+    
+    Returns:
+        dict: Parsed JSON response from the model.
+    
+    Raises:
+        json.JSONDecodeError: If JSON parsing fails even after repair attempt.
     """
     messages = [{"role": "user", "content": prompt}]
     input_ids = _tokenizer.apply_chat_template(
@@ -111,83 +112,10 @@ def generate(prompt: str, max_new_tokens: int = 1024) -> dict:
     raw_result = _tokenizer.decode(generated, skip_special_tokens=True)
     logger.debug(raw_result)
     try:
-      parsed = json.loads(raw_result)
+        parsed = json.loads(raw_result)
     except json.JSONDecodeError:
-      parsed = json.loads(repair_json(raw_result))
+        parsed = json.loads(repair_json(raw_result))
     return parsed
-
-
-# def prompt_llama(client: Groq, prompt: str) -> dict:
-#     """
-#     Call the Groq Llama API with exponential backoff retry logic.
-#
-#     This function sends a prompt to the Groq API (using Llama 3.3-70b model)
-#     and handles transient failures with exponential backoff. It expects a JSON
-#     response and automatically parses it.
-#
-#     Args:
-#         client (Groq): Initialized Groq client instance.
-#         prompt (str): The prompt to send to the API. Should be a well-formatted
-#                      string that will be sent as user content.
-#
-#     Returns:
-#         dict: Parsed JSON response from the API.
-#
-#     Raises:
-#         RuntimeError: If all MAX_RETRIES attempts fail or if JSON parsing fails
-#                      without a successful retry.
-#
-#     Notes:
-#         - Retries up to MAX_RETRIES times with exponential backoff
-#         - Wait time = BASE_BACKOFF_SECONDS * attempt_number
-#         - HTTP errors and transient API errors trigger retries
-#         - JSON parse errors don't trigger retries (assumed to be response malformation)
-#         - All API calls and errors are logged at appropriate levels (INFO/WARNING/ERROR)
-#     """
-#     last_error = None
-#     for attempt in range(1, MAX_RETRIES + 1):
-#         try:
-#             logger.info(f"Calling Groq API (attempt {attempt}/{MAX_RETRIES}) with model: {MODEL_NAME}")
-#             logger.debug(f"Prompt length: {len(prompt)} characters")
-#
-#             response = client.chat.completions.create(
-#                 model=MODEL_NAME,
-#                 messages=[{"role": USER_ROLE, "content": prompt}],
-#                 temperature=TEMPERATURE,
-#                 max_tokens=MAX_OUTPUT_TOKENS,
-#                 response_format={"type": "json_object"},
-#             )
-#
-#             logger.info(f"API call successful on attempt {attempt}")
-#             raw = response.choices[0].message.content
-#             result = json.loads(raw)
-#             logger.debug(f"Successfully parsed JSON response")
-#             return result
-#         except json.JSONDecodeError as e:
-#             last_error = f"JSON parse error: {e}"
-#             logger.warning(f"JSON parsing failed on attempt {attempt}: {last_error}")
-#         except HTTPStatusError as e:
-#             last_error = str(e)
-#             wait = BASE_BACKOFF_SECONDS * attempt
-#             logger.warning(
-#                 f"HTTP error on attempt {attempt}/{MAX_RETRIES}: {last_error} -- waiting {wait}s before retry")
-#             time.sleep(wait)
-#             continue
-#         except Exception as e:
-#             # Groq rate-limit / transient errors: back off and retry
-#             last_error = str(e)
-#             wait = BASE_BACKOFF_SECONDS * attempt
-#             logger.warning(
-#                 f"API error on attempt {attempt}/{MAX_RETRIES}: {last_error} -- waiting {wait}s before retry")
-#             time.sleep(wait)
-#             continue
-#         # If we got here without exception, JSON parsed successfully -> exit loop
-#         break
-#     else:
-#         error_msg = f"Failed after {MAX_RETRIES} attempts: {last_error}"
-#         logger.error(error_msg)
-#         raise RuntimeError(error_msg)
-#     return None  # unreachable, kept for clarity
 
 
 def build_prompt(article_text: str, frames: dict) -> str:
@@ -221,6 +149,156 @@ def build_prompt(article_text: str, frames: dict) -> str:
         frames_json=frames_json_str,
         article=article_text,
     )
+
+
+def parse_arguments():
+    """Parse and return command-line arguments."""
+    parser = argparse.ArgumentParser(description="Label narrative frames via local Llama 3.1-8B model.")
+    parser.add_argument("--input", required=True, help="CSV with columns: article_id, article_text")
+    parser.add_argument("--output", required=True, help="Path to write output CSV")
+    return parser.parse_args()
+
+
+def load_resources(input_file: str) -> tuple:
+    """
+    Load frames and articles from input file.
+    
+    Args:
+        input_file (str): Path to input CSV file with articles.
+    
+    Returns:
+        tuple: (frames dict, articles list)
+    """
+    logger.info("Loading frames configuration...")
+    frames = read_frames()
+    logger.info(f"Loaded {len(frames)} frames")
+
+    logger.info(f"Reading articles from {input_file}...")
+    articles_csv = read_processed_data(input_file)
+    logger.info(f"Total articles to process: {len(articles_csv)}")
+
+    return frames, articles_csv
+
+
+def load_existing_results(output_path: str) -> tuple:
+    """
+    Load existing results for resume capability.
+    
+    Args:
+        output_path (str): Path to output CSV file.
+    
+    Returns:
+        tuple: (already_done set of article_ids, existing rows list)
+    """
+    already_done = set()
+    rows = []
+
+    full_path = get_processed_data_path() / output_path
+    if Path(full_path).exists():
+        existing = pd.read_csv(full_path)
+        already_done = set(existing["article_id"].astype(str))
+        rows = existing.to_dict("records")
+        logger.info(f"Resuming: {len(already_done)} articles already labeled")
+
+    return already_done, rows
+
+
+def process_single_article(article: dict, frames: dict) -> dict:
+    """
+    Process a single article: classify and validate results.
+    
+    Args:
+        article (dict): Article data with 'article_id' and 'text'.
+        frames (dict): Frame definitions.
+    
+    Returns:
+        dict: Result row with classification data, or None if failed.
+    """
+    article_id = article["article_id"]
+    article_text = article["text"]
+
+    logger.info(f"Processing article {article_id} ({len(article_text)} characters)")
+    prompt = build_prompt(article_text, frames)
+
+    try:
+        result = generate(prompt)
+        logger.info(f"Article {article_id}: Successfully classified")
+    except RuntimeError as e:
+        logger.error(f"Article {article_id}: Classification failed - {e}")
+        failed_row = {
+            "article_id": article_id,
+            "overall_stance": None,
+            "dominant_narrative": None,
+            "frames_json": None,
+            "validation_warnings": f"MODEL_FAILURE: {e}",
+            "human_verified": False,
+            "human_corrected_narrative": "",
+        }
+        _append_failure(failed_row)
+        return None
+
+    warnings = validate_result(result, frames, article_text)
+    if warnings:
+        logger.warning(f"Article {article_id}: Validation warnings - {'; '.join(warnings)}")
+
+    return {
+        "article_id": article_id,
+        "overall_stance": result.get("overall_stance"),
+        "dominant_narrative": result.get("dominant_narrative"),
+        "frames_json": json.dumps(result.get("frames", [])),
+        "validation_warnings": "; ".join(warnings) if warnings else "",
+        "human_verified": False,
+        "human_corrected_narrative": "",
+    }
+
+
+def process_articles(articles_csv: list, frames: dict, already_done: set, rows: list, output_path: str) -> tuple:
+    """
+    Process all articles with incremental saving every 5 articles.
+    
+    Args:
+        articles_csv (list): List of articles to process.
+        frames (dict): Frame definitions.
+        already_done (set): Set of already-processed article IDs.
+        rows (list): Existing result rows (for resume).
+        output_path (str): Path to save results.
+    
+    Returns:
+        tuple: (processed_count, failed_count)
+    """
+    processed_count = 0
+    failed_count = 0
+    SAVE_INTERVAL = 5
+    batch_rows = []
+
+    for article in articles_csv:
+        article_id = article["article_id"]
+        if article_id in already_done:
+            continue
+
+        try:
+            result_row = process_single_article(article, frames)
+            if result_row:
+                batch_rows.append(result_row)
+                rows.append(result_row)
+                processed_count += 1
+            else:
+                failed_count += 1
+        except Exception as e:
+            logger.error(f"Unexpected error processing article {article_id}: {e}")
+            failed_count += 1
+            continue
+
+        logger.info(f"Progress: {processed_count} articles processed")
+
+        if processed_count % SAVE_INTERVAL == 0:
+            logger.info(f"Incremental save: {processed_count} articles processed so far")
+            _save(batch_rows, output_path, incremental=True)
+            batch_rows = []
+
+        time.sleep(5)  # gentle pacing to manage resource usage
+
+    return processed_count, failed_count
 
 
 def validate_result(result: dict, frames: dict, article_text: str) -> list:
@@ -283,27 +361,22 @@ def main():
     Main entry point for the narrative frame classification pipeline.
     
     Orchestrates the complete workflow:
-    1. Parses command-line arguments (--input and --output file paths)
-    2. Initializes Groq API client
-    3. Loads frame definitions from configuration
-    4. Reads input CSV file (expected columns: article_id, text)
-    5. Supports resume: skips articles already in output file if it exists
-    6. For each article:
-       - Constructs prompt with article text and frames
-       - Calls Groq API via prompt_llama()
-       - Validates response
-       - Accumulates results
-    7. Saves all results to output CSV
-    8. Handles KeyboardInterrupt gracefully by saving checkpoint
+    1. Parses command-line arguments
+    2. Loads the local Llama 3.1-8B-Instruct model with 4-bit quantization
+    3. Loads frame definitions and articles from configuration
+    4. Supports resume: skips articles already in output file if it exists
+    5. Processes articles with validation and incremental saving
+    6. Handles KeyboardInterrupt gracefully by saving checkpoint
     
     Command-line Arguments:
         --input (str, required): Path to CSV file with article_id and text columns.
         --output (str, required): Path where results CSV will be written.
     
     Behavior:
-        - Creates output directory if it doesn't exist
+        - Loads resources (model, frames, articles)
         - Resumes from existing output file (skips already-processed articles)
-        - Pauses 5 seconds between API calls to respect rate limits
+        - Incremental save after every 5 processed articles
+        - Pauses 5 seconds between model calls to manage resource usage
         - On Ctrl+C, saves checkpoint with current progress
         - Logs progress, warnings, and errors throughout execution
     
@@ -316,97 +389,26 @@ def main():
         - human_verified: Boolean (initialized as False for manual review)
         - human_corrected_narrative: String (initialized empty for manual corrections)
     
-    Raises:
-        FileNotFoundError: If input file or configuration files don't exist.
-        RuntimeError: If API calls fail after all retries (logged and breaks loop).
-    
     Note:
         - All logging goes to both console and timestamped log file in logs/ directory
         - Failed articles are saved to a separate failures.csv file
     """
-    parser = argparse.ArgumentParser(description="Label narrative frames via Groq/Llama 3.3.")
-    parser.add_argument("--input", required=True, help="CSV with columns: article_id, article_text")
-    parser.add_argument("--output", required=True, help="Path to write output CSV")
-
-    args = parser.parse_args()
+    args = parse_arguments()
 
     logger.info("=" * 80)
     logger.info("Starting narrative classification job")
     logger.info(f"Input file: {args.input}")
     logger.info(f"Output file: {args.output}")
 
-    # client = Groq()
     load_model()
 
-    logger.info("Loading frames configuration...")
-    frames = read_frames()
-    logger.info(f"Loaded {len(frames)} frames")
+    frames, articles_csv = load_resources(args.input)
+    already_done, rows = load_existing_results(args.output)
 
-    logger.info(f"Reading articles from {args.input}...")
-    articles_csv = read_processed_data(args.input)
-    logger.info(f"Total articles to process: {len(articles_csv)}")
-
-    # Resume support: skip articles already present in an existing output file
-    already_done = set()
-    if Path(args.output).exists():
-        existing = pd.read_csv(args.output)
-        already_done = set(existing["article_id"].astype(str))
-        rows = existing.to_dict("records")
-        logger.info(f"Resuming: {len(already_done)} articles already labeled")
-    else:
-        rows = []
-
-    processed_count = 0
-    failed_count = 0
     try:
-
-        for articles in articles_csv:
-            article_id = articles["article_id"]
-            if article_id in already_done:
-                continue
-
-            article_text = articles["text"]
-            logger.info(f"Processing article {article_id} ({len(article_text)} characters)")
-            prompt = build_prompt(article_text, frames)
-
-            try:
-                # result = prompt_llama(client, prompt)
-                result = generate(prompt)
-                logger.info(f"Article {article_id}: Successfully classified")
-                return
-            except RuntimeError as e:
-                logger.error(f"Article {article_id}: Classification failed - {e}")
-                failed_count += 1
-                failed_row = {
-                    "article_id": article_id,
-                    "overall_stance": None,
-                    "dominant_narrative": None,
-                    "frames_json": None,
-                    "validation_warnings": f"API_FAILURE: {e}",
-                    "human_verified": False,
-                    "human_corrected_narrative": "",
-                }
-                _append_failure(failed_row)
-                continue
-
-            warnings = validate_result(result, frames, article_text)
-            if warnings:
-                logger.warning(f"Article {article_id}: Validation warnings - {'; '.join(warnings)}")
-
-            rows.append({
-                "article_id": article_id,
-                "overall_stance": result.get("overall_stance"),
-                "dominant_narrative": result.get("dominant_narrative"),
-                "frames_json": json.dumps(result.get("frames", [])),
-                "validation_warnings": "; ".join(warnings) if warnings else "",
-                "human_verified": False,  # fill in during manual review
-                "human_corrected_narrative": "",  # fill in during manual review, if needed
-            })
-
-            processed_count += 1
-            logger.info(f"Progress: {processed_count} articles processed")
-
-            time.sleep(5)  # gentle pacing against Groq free-tier rate limits
+        processed_count, failed_count = process_articles(
+            articles_csv, frames, already_done, rows, args.output
+        )
 
         _save(rows, args.output)
 
@@ -420,10 +422,9 @@ def main():
         logger.warning("=" * 80)
 
         if rows:
-            checkpoint_name = args.output
-            _save(rows, checkpoint_name)
-            logger.info(f"Checkpoint saved: {checkpoint_name}")
-            logger.info(f"Processed so far: {processed_count} articles, {failed_count} failures")
+            _save(rows, args.output)
+            logger.info(f"Checkpoint saved: {args.output}")
+            logger.info(f"Processed so far: {len(rows)} articles")
         else:
             logger.warning("No rows to save - no articles were processed")
 
@@ -431,13 +432,12 @@ def main():
         logger.warning("=" * 80)
 
 
-def _save(rows: list, output_path: str) -> None:
+def _save(rows: list, output_path: str, incremental: bool = False) -> None:
     """
     Save classification results to a CSV file.
     
-    Converts a list of result dictionaries into a pandas DataFrame and saves
-    it as a CSV file in the project's data/processed/ directory. Creates the
-    output directory if it doesn't exist.
+    Supports both full overwrites and incremental appends. When incremental is True,
+    appends new rows to the existing file (if it exists). When False, overwrites the file.
     
     Args:
         rows (list): List of dictionaries containing classification results.
@@ -445,6 +445,7 @@ def _save(rows: list, output_path: str) -> None:
                     dominant_narrative, frames_json, validation_warnings, etc.
         output_path (str): Filename for the output CSV (relative name, not full path).
                           Will be saved to data/processed/{output_path}.
+        incremental (bool): If True, append new rows; if False, overwrite file (default: False).
     
     Returns:
         None
@@ -457,8 +458,15 @@ def _save(rows: list, output_path: str) -> None:
         - Creates parent directories if they don't exist
     """
     full_path = f"{get_project_root()}/data/processed/{output_path}"
-    logger.info(f"Saving {len(rows)} rows to {output_path}")
-    pd.DataFrame(rows).to_csv(full_path, index=False)
+
+    if incremental and Path(full_path).exists():
+        logger.info(f"Appending {len(rows)} rows to {output_path} (incremental save)")
+        df = pd.DataFrame(rows)
+        df.to_csv(full_path, mode="a", header=False, index=False)
+    else:
+        logger.info(f"Saving {len(rows)} rows to {output_path}")
+        pd.DataFrame(rows).to_csv(full_path, index=False)
+
     logger.debug(f"File saved successfully to {full_path}")
 
 
