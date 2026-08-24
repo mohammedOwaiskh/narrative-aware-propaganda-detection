@@ -33,6 +33,7 @@ Usage:
 Author: Mohammed Owais Khan
 """
 import argparse
+import os
 import time
 from pathlib import Path
 
@@ -57,9 +58,40 @@ _tokenizer = None
 
 
 def load_model():
-    """Call once at the start of the script. Loads 4-bit quantized model onto T4."""
+    """
+    Load 4-bit quantized Llama model with HuggingFace authentication.
+    
+    Requires:
+    - HuggingFace account with access to meta-llama/Llama-3.1-8B-Instruct
+    - Either HF_TOKEN environment variable or huggingface login via CLI
+    - At least 10GB free disk space for model cache
+    
+    To set up authentication:
+    1. Accept license at https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct
+    2. Create HF token at https://huggingface.co/settings/tokens
+    3. Set: export HF_TOKEN="your_token" or huggingface-cli login
+    
+    Raises:
+        OSError: If authentication fails or model cannot be downloaded
+    """
     global _model, _tokenizer
+    
+    try:
+        from huggingface_hub import login
+        
+        # Try to login using token if available
+        token = os.getenv("HF_TOKEN")
+        if token:
+            login(token=token, add_to_git_credential=False)
+            logger.info("Authenticated with HuggingFace using HF_TOKEN")
+        else:
+            logger.warning("No HF_TOKEN found. Ensure you've run 'huggingface-cli login'")
+    except Exception as e:
+        logger.warning(f"HuggingFace login skipped: {e}")
 
+    logger.info(f"Loading model: {MODEL_NAME}")
+    logger.info("This may take 2-5 minutes on first run (model is ~16GB)")
+    
     bnb_config = BitsAndBytesConfig(
         load_in_4bit=True,
         bnb_4bit_quant_type="nf4",
